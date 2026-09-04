@@ -26,7 +26,7 @@ def unsharp_mask(image, sigma=1.0, s=1.0):
         
     return sharpened
 
-def process_and_save(image_path, output_dir="output", sigma_val=1.5, s1=1.0, s2=2.5):
+def process_and_save(image_path, output_dir=".", sigma_val=1.5, s1=1.0, s2=2.5):
     """
     Loads an image, computes two sharpened versions, and saves each image 
     separately to the specified output directory.
@@ -79,6 +79,6 @@ image_paths = [
 
 for path in image_paths:
     try:
-        process_and_save(path, output_dir="output", sigma_val=1.5, s1=1.0, s2=2.5)
+        process_and_save(path, output_dir="output_q1", sigma_val=3.0, s1=1.5, s2=3.0)
     except FileNotFoundError:
         print(f"File not found: {path}. Please verify your image path.")
