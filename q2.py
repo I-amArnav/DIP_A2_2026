@@ -68,14 +68,45 @@ def compute_masked_ncc_channel_fast(image_channel, template_channel, mask):
 def resize_image(img, new_shape):
     h, w = new_shape[:2]
     orig_h, orig_w = img.shape[:2]
-    
-    r_indices = (np.linspace(0, orig_h - 1, h)).astype(int)
-    c_indices = (np.linspace(0, orig_w - 1, w)).astype(int)
-    
+
+    y = np.linspace(0, orig_h - 1, h)
+    x = np.linspace(0, orig_w - 1, w)
+
+    y0 = np.floor(y).astype(int)
+    x0 = np.floor(x).astype(int)
+    y1 = np.minimum(y0 + 1, orig_h - 1)
+    x1 = np.minimum(x0 + 1, orig_w - 1)
+    wy = y - y0
+    wx = x - x0
+
     if img.ndim == 3:
-        return img[np.ix_(r_indices, c_indices, np.arange(img.shape[2]))]
+        result = np.empty((h, w, img.shape[2]), dtype=np.float64)
+
+        for c in range(img.shape[2]):
+            Ia = img[y0[:, None], x0[None, :], c]
+            Ib = img[y0[:, None], x1[None, :], c]
+            Ic = img[y1[:, None], x0[None, :], c]
+            Id = img[y1[:, None], x1[None, :], c]
+
+            result[:, :, c] = (
+                Ia * (1 - wy[:, None]) * (1 - wx[None, :]) +
+                Ib * (1 - wy[:, None]) * wx[None, :] +
+                Ic * wy[:, None] * (1 - wx[None, :]) +
+                Id * wy[:, None] * wx[None, :]
+            )
     else:
-        return img[np.ix_(r_indices, c_indices)]
+        Ia = img[y0[:, None], x0[None, :]]
+        Ib = img[y0[:, None], x1[None, :]]
+        Ic = img[y1[:, None], x0[None, :]]
+        Id = img[y1[:, None], x1[None, :]]
+
+        result = (
+            Ia * (1 - wy[:, None]) * (1 - wx[None, :]) +
+            Ib * (1 - wy[:, None]) * wx[None, :] +
+            Ic * wy[:, None] * (1 - wx[None, :]) +
+            Id * wy[:, None] * wx[None, :]
+        )
+    return result
 
 scene = imageio.imread('data/templateMatch/parking.png')
 template = imageio.imread('data/templateMatch/templateNoPark.png')

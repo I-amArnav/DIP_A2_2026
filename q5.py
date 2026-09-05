@@ -2,61 +2,18 @@ import os
 import imageio.v3 as iio
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
-def mean_shift_segmentation(img, spatial_radius=15, color_radius=30, max_iter=10):
-
-    h, w, c = img.shape
-    grid_y, grid_x = np.mgrid[0:h, 0:w]
-    
-    features = np.zeros((h, w, 5), dtype=np.float32)
-    features[:, :, 0:3] = img.astype(np.float32)
-    features[:, :, 3] = grid_x.astype(np.float32)
-    features[:, :, 4] = grid_y.astype(np.float32)
-
-    shifted_features = np.copy(features)
-
-    step = 2 
-    for y in range(0, h, step):
-        for x in range(0, w, step):
-            curr_pt = features[y, x].copy()
-            
-            for _ in range(max_iter):
-                min_x = max(0, int(curr_pt[3] - spatial_radius))
-                max_x = min(w, int(curr_pt[3] + spatial_radius + 1))
-                min_y = max(0, int(curr_pt[4] - spatial_radius))
-                max_y = min(h, int(curr_pt[4] + spatial_radius + 1))
-                
-                window = features[min_y:max_y, min_x:max_x]
-                
-                color_dist = np.linalg.norm(window[:, :, 0:3] - curr_pt[0:3], axis=2)
-                spatial_dist = np.linalg.norm(window[:, :, 3:5] - curr_pt[3:5], axis=2)
-                
-                mask = (color_dist <= color_radius) & (spatial_dist <= spatial_radius)
-                
-                if not np.any(mask):
-                    break
-                    
-                new_pt = np.mean(window[mask], axis=0)
-                
-                if np.linalg.norm(new_pt - curr_pt) < 0.5:
-                    break
-                curr_pt = new_pt
-
-            shifted_features[max(0, y-1):min(h, y+2), max(0, x-1):min(w, x+2), 0:3] = curr_pt[0:3]
-
-    segmented_img = shifted_features[:, :, 0:3].astype(np.uint8)
-    
-    gray = cv2.cvtColor(segmented_img, cv2.COLOR_RGB2GRAY)
-    _, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    if mask[0, 0] == 255 and mask[0, -1] == 255:
-        mask = cv2.bitwise_not(mask)
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-    
-    return (mask > 0).astype(np.uint8)
+def mean_shift_segmentation(img, spatial_radius=15, color_radius=30):
+    img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    segmented_bgr = cv2.pyrMeanShiftFiltering(
+        img_bgr,
+        sp=spatial_radius,
+        sr=color_radius,
+        maxLevel=1
+    )
+    segmented_rgb = cv2.cvtColor(segmented_bgr, cv2.COLOR_BGR2RGB)
+    return segmented_rgb
 
 def get_manual_mask(img):
     h, w = img.shape[:2]
@@ -86,7 +43,7 @@ def apply_bokeh_blur(img, fg_mask, diameter):
     kernel = create_disc_kernel(diameter)
     k_dim = kernel.shape[0]
     r = k_dim // 2
-    
+
     padded_img = cv2.copyMakeBorder(img, r, r, r, r, cv2.BORDER_CONSTANT, value=0)
     padded_bg = cv2.copyMakeBorder(bg_mask, r, r, r, r, cv2.BORDER_CONSTANT, value=0)
     
@@ -106,7 +63,6 @@ def apply_bokeh_blur(img, fg_mask, diameter):
         conv_ch = cv2.filter2D(img_float[:, :, ch], -1, norm_kernel)
         output_bg[:, :, ch][fast_indices] = conv_ch[fast_indices]
         
-    # Dynamic re-weighted filtering near boundaries
     boundary_y, boundary_x = np.where((dist_map < r) & (bg_mask == 1))
     
     for y, x in zip(boundary_y, boundary_x):
@@ -130,42 +86,80 @@ def apply_bokeh_blur(img, fg_mask, diameter):
         
     return np.clip(final_result, 0, 255).astype(np.uint8)
 
+input_dir="./data/bokeh", output_dir="./output_q5"
+os.makedirs(output_dir, exist_ok=True)
 
-def process_and_save_all(input_dir="./data/bokeh", output_dir="./output_q5"):
-    os.makedirs(output_dir, exist_ok=True)
+images_config = [
+    {"filename": "deep.png", "is_manual": True},
+    {"filename": "lotus.png", "is_manual": False},
+    {"filename": "marigold.png", "is_manual": False}
+]
+for cfg in images_config:
+    in_path = os.path.join(input_dir, cfg["filename"])
     
-    images_config = [
-        {"filename": "deep.png", "is_manual": True},
-        {"filename": "lotus.png", "is_manual": False},
-        {"filename": "marigold.png", "is_manual": False}
-    ]
+    if not os.path.exists(in_path):
+        print(f"Skipping {in_path}: File not found.")
+        continue
+    print(f"Processing {cfg['filename']}...")
     
-    for cfg in images_config:
-        in_path = os.path.join(input_dir, cfg["filename"])
-        
-        if not os.path.exists(in_path):
-            print(f"Skipping {in_path}: File not found.")
-            continue
-            
-        print(f"Processing {cfg['filename']}...")
-        
-        img_rgb = iio.imread(in_path)        
-        if cfg["is_manual"]:
-            fg_mask = get_manual_mask(img_rgb)
-        else:
-            fg_mask = mean_shift_segmentation(img_rgb, spatial_radius=15, color_radius=30)
-            
-        bokeh_50 = apply_bokeh_blur(img_rgb, fg_mask, diameter=50)
-        bokeh_100 = apply_bokeh_blur(img_rgb, fg_mask, diameter=100)
-        
-        base_name = os.path.splitext(cfg["filename"])[0]
-        out_50_path = os.path.join(output_dir, f"{base_name}_bokeh_50.png")
-        out_100_path = os.path.join(output_dir, f"{base_name}_bokeh_100.png")
-        
-        iio.imwrite(out_50_path, bokeh_50)
-        iio.imwrite(out_100_path, bokeh_100)
-        
-        print(f"Saved: {out_50_path}")
-        print(f"Saved: {out_100_path}")
+    img_rgb = iio.imread(in_path)        
+    if cfg["is_manual"]:
+        fg_mask = get_manual_mask(img_rgb)
+    else:
+        segmented_img = mean_shift_segmentation(
+            img_rgb,
+            spatial_radius=15,
+            color_radius=30
+        )
+        border_width = 10
 
-process_and_save_all(input_dir="./data/bokeh", output_dir="./output_q5")
+        border_pixels = np.concatenate([
+            segmented_img[:border_width, :, :].reshape(-1, 3),
+            segmented_img[-border_width:, :, :].reshape(-1, 3),
+            segmented_img[:, :border_width, :].reshape(-1, 3),
+            segmented_img[:, -border_width:, :].reshape(-1, 3)
+        ])
+        background_color = np.mean(border_pixels, axis=0)
+
+        color_distance = np.linalg.norm(
+            segmented_img.astype(np.float32) -
+            background_color.astype(np.float32),
+            axis=2
+        )
+        fg_mask = (color_distance > 30).astype(np.uint8)
+        
+    bokeh_50 = apply_bokeh_blur(img_rgb, fg_mask, diameter=50)
+    bokeh_100 = apply_bokeh_blur(img_rgb, fg_mask, diameter=100)
+    
+    base_name = os.path.splitext(cfg["filename"])[0]
+    mask_path = os.path.join(
+        output_dir,
+        f"{base_name}_binary.png"
+    )
+    iio.imwrite(
+        mask_path,
+        (fg_mask * 255).astype(np.uint8)
+    )
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    axes[0].imshow(img_rgb)
+    axes[0].set_title("Original Image")
+    axes[0].axis("off")
+    axes[1].imshow(bokeh_50)
+    axes[1].set_title("Bokeh Blur (Diameter = 50)")
+    axes[1].axis("off")
+    axes[2].imshow(bokeh_100)
+    axes[2].set_title("Bokeh Blur (Diameter = 100)")
+    axes[2].axis("off")
+    plt.tight_layout()
+    display_path = os.path.join( output_dir, f"{base_name}_comparison.png" )
+    plt.savefig(display_path, bbox_inches="tight", dpi=300)
+    plt.show()
+    plt.close(fig)
+    out_50_path = os.path.join(output_dir, f"{base_name}_bokeh_50.png")
+    out_100_path = os.path.join(output_dir, f"{base_name}_bokeh_100.png")
+    
+    iio.imwrite(out_50_path, bokeh_50)
+    iio.imwrite(out_100_path, bokeh_100)
+    
+    print(f"Saved: {out_50_path}")
+    print(f"Saved: {out_100_path}")

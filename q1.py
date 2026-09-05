@@ -5,9 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 
 def unsharp_mask(image, sigma=1.0, s=1.0):
-    """
-    Implements unsharp masking: Output = F + s * (F - Gauss * F)
-    """
+
     image_float = image.astype(np.float64)
     
     if image_float.ndim == 3:
@@ -20,17 +18,15 @@ def unsharp_mask(image, sigma=1.0, s=1.0):
     mask = image_float - blurred
     sharpened = image_float + s * mask
     
-    # Clip and round RGB images to integer uint8
     if image.ndim == 3:
-        sharpened = np.clip(sharpened, 0, 255).astype(image.dtype)
+        input_min = np.min(image_float)
+        input_max = np.max(image_float)
+        sharpened = np.clip(sharpened, input_min, input_max).astype(np.uint8)
         
     return sharpened
 
 def process_and_save(image_path, output_dir=".", sigma_val=1.5, s1=1.0, s2=2.5):
-    """
-    Loads an image, computes two sharpened versions, and saves each image 
-    separately to the specified output directory.
-    """
+
     os.makedirs(output_dir, exist_ok=True)
     base_name = os.path.splitext(os.path.basename(image_path))[0]
     
@@ -56,7 +52,6 @@ def process_and_save(image_path, output_dir=".", sigma_val=1.5, s1=1.0, s2=2.5):
         save_path = os.path.join(output_dir, filename)
         
         if is_gray:
-            # Create a dedicated figure to include colorbar and 256-level gray colormap
             fig, ax = plt.subplots(figsize=(6, 6))
             im = ax.imshow(data, cmap='gray', vmin=vmin, vmax=vmax)
             ax.set_title(title)
@@ -65,12 +60,10 @@ def process_and_save(image_path, output_dir=".", sigma_val=1.5, s1=1.0, s2=2.5):
             plt.savefig(save_path, bbox_inches='tight', dpi=300)
             plt.close(fig)
         else:
-            # Save standard RGB image directly
             iio.imwrite(save_path, data)
             
         print(f"Saved: {save_path}")
 
-# --- Example Run ---
 image_paths = [
     "data/sharpen/moon.png",
     "data/sharpen/peacock.png",

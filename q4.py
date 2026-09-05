@@ -8,7 +8,7 @@ def compute_structure_tensor(img, sigma_d=1.0, sigma_i=1.5):
         gray = 0.2989 * img[:, :, 0] + 0.5870 * img[:, :, 1] + 0.1140 * img[:, :, 2]
     else:
         gray = img.astype(np.float64)
-    
+
     if gray.max() > 1.0:
         gray /= 255.0
     Ix = gaussian_filter(gray, sigma=sigma_d, order=(0, 1))
@@ -60,14 +60,15 @@ def detect_corners(response, nms_size=5, threshold=0.01):
     binary_map = (nms_map > 0).astype(np.uint8)
     return nms_map, binary_map
 
-def harris_stephens_edge_detection(C_harris, nms_size=3, edge_threshold=-0.001):
+def harris_stephens_edge_detection(C_harris, nms_size=3, edge_threshold=0.0001):
 
-    edgeness = np.where(C_harris < 0, -C_harris, 0.0)    
-    nms_edge = non_maximum_suppression_2d(edgeness, neighborhood_size=nms_size)    
-    thresh_val = abs(edge_threshold)
-    binary_edge = (nms_edge > thresh_val).astype(np.uint8)
-    
-    return edgeness, nms_edge, binary_edge
+    edgeness = np.maximum(-C_harris, 0.0)
+    nms_edge_strength = non_maximum_suppression_2d(
+        edgeness,
+        neighborhood_size=nms_size
+    )
+    binary_edge = (nms_edge_strength > edge_threshold).astype(np.uint8)
+    return nms_edge_strength, binary_edge
 
 def normalize_and_convert_u8(img_float):
 
@@ -111,9 +112,7 @@ def process_image(img_path, output_dir, params):
         C_shitomasi, nms_size=params['nms_size'], threshold=params['st_thresh']
     )
 
-    edgeness, edge_nms, edge_binary = harris_stephens_edge_detection(
-        C_harris, nms_size=params['edge_nms_size'], edge_threshold=params['edge_thresh']
-    )
+    edge_nms_C, edge_binary = harris_stephens_edge_detection( C_harris, nms_size=params['edge_nms_size'], edge_threshold=params['edge_thresh'] )
 
     orig_u8 = normalize_and_convert_u8(gray)
     harris_corners_overlay = draw_pixels_on_image(orig_u8, harris_binary, color_rgb=[0, 0, 0])      # Black corners
@@ -130,7 +129,7 @@ def process_image(img_path, output_dir, params):
     iio.imwrite(os.path.join(output_dir, f"{base_name}_6_shi_tomasi_binary.png"), (st_binary * 255).astype(np.uint8))
     iio.imwrite(os.path.join(output_dir, f"{base_name}_7_harris_corners_drawn.png"), harris_corners_overlay)
     iio.imwrite(os.path.join(output_dir, f"{base_name}_7_shi_tomasi_corners_drawn.png"), st_corners_overlay)
-    iio.imwrite(os.path.join(output_dir, f"{base_name}_8_harris_edgeness_nms.png"), normalize_and_convert_u8(edge_nms))
+    iio.imwrite(os.path.join(output_dir, f"{base_name}_8_harris_edgeness_nms.png"), normalize_and_convert_u8(edge_nms_C) )
     iio.imwrite(os.path.join(output_dir, f"{base_name}_9_harris_edge_binary.png"), (edge_binary * 255).astype(np.uint8))
     iio.imwrite(os.path.join(output_dir, f"{base_name}_10_harris_edges_drawn.png"), harris_edges_overlay)
 

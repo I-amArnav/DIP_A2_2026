@@ -54,7 +54,7 @@ def canny_edge_detector(img, sigma=1.0, threshold_low=0.05, threshold_high=0.20)
                     stack.append((nr, nc))
     return edges.astype(np.uint8) * 255
 
-def process_and_save(image_path, sigma, low_thresh, high_thresh, output_dir="output_c"):
+def process_and_save(image_path, sigma, low_thresh, high_thresh, output_dir="output_q3"):
 
     os.makedirs(output_dir, exist_ok=True)    
     img = iio.imread(image_path)
