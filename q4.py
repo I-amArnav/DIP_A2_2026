@@ -60,15 +60,24 @@ def detect_corners(response, nms_size=5, threshold=0.01):
     binary_map = (nms_map > 0).astype(np.uint8)
     return nms_map, binary_map
 
-def harris_stephens_edge_detection(C_harris, nms_size=3, edge_threshold=0.0001):
+def harris_stephens_edge_detection(C_harris, nms_size=3, edge_threshold=0.01):
 
     edgeness = np.maximum(-C_harris, 0.0)
     nms_edge_strength = non_maximum_suppression_2d(
         edgeness,
         neighborhood_size=nms_size
     )
-    binary_edge = (nms_edge_strength > edge_threshold).astype(np.uint8)
-    return nms_edge_strength, binary_edge
+    max_edge = np.max(nms_edge_strength)
+    if max_edge > 0:
+        thresh_val = edge_threshold * max_edge
+    else:
+        thresh_val = 0
+    binary_edge = (
+        (nms_edge_strength > 0) &
+        (nms_edge_strength >= thresh_val)
+    ).astype(np.uint8)
+    nms_C = np.where(binary_edge > 0, nms_edge_strength, 0.0)
+    return nms_C, binary_edge
 
 def normalize_and_convert_u8(img_float):
 
@@ -140,17 +149,17 @@ configs = {
     'data/corner/nandadevi.png': {
         'sigma_d': 1.0, 'sigma_i': 1.5, 'k': 0.04,
         'nms_size': 5, 'harris_thresh': 0.01, 'st_thresh': 0.02,
-        'edge_nms_size': 3, 'edge_thresh': 0.0001
+        'edge_nms_size': 3, 'edge_thresh': 0.05
     },
     'data/corner/paithaniCorner.png': {
         'sigma_d': 1.0, 'sigma_i': 1.5, 'k': 0.04,
         'nms_size': 5, 'harris_thresh': 0.015, 'st_thresh': 0.025,
-        'edge_nms_size': 3, 'edge_thresh': 0.0001
+        'edge_nms_size': 3, 'edge_thresh': 0.05
     },
     'data/corner/warli.png': {
         'sigma_d': 1.0, 'sigma_i': 1.5, 'k': 0.04,
         'nms_size': 5, 'harris_thresh': 0.01, 'st_thresh': 0.02,
-        'edge_nms_size': 3, 'edge_thresh': 0.0001
+        'edge_nms_size': 3, 'edge_thresh': 0.05
     }
 }
 

@@ -86,13 +86,14 @@ def apply_bokeh_blur(img, fg_mask, diameter):
         
     return np.clip(final_result, 0, 255).astype(np.uint8)
 
-input_dir="./data/bokeh", output_dir="./output_q5"
+input_dir="./data/bokeh"
+output_dir="./output_q5"
 os.makedirs(output_dir, exist_ok=True)
 
 images_config = [
-    {"filename": "deep.png", "is_manual": True},
-    {"filename": "lotus.png", "is_manual": False},
-    {"filename": "marigold.png", "is_manual": False}
+    {"filename": "deep.png"},
+    {"filename": "lotus.png"},
+    {"filename": "marigold.png"}
 ]
 for cfg in images_config:
     in_path = os.path.join(input_dir, cfg["filename"])
@@ -103,30 +104,31 @@ for cfg in images_config:
     print(f"Processing {cfg['filename']}...")
     
     img_rgb = iio.imread(in_path)        
-    if cfg["is_manual"]:
-        fg_mask = get_manual_mask(img_rgb)
-    else:
-        segmented_img = mean_shift_segmentation(
-            img_rgb,
-            spatial_radius=15,
-            color_radius=30
-        )
-        border_width = 10
+    segmented_img = mean_shift_segmentation(
+        img_rgb,
+        spatial_radius=15,
+        color_radius=30
+    )
+    border_width = 10
 
-        border_pixels = np.concatenate([
-            segmented_img[:border_width, :, :].reshape(-1, 3),
-            segmented_img[-border_width:, :, :].reshape(-1, 3),
-            segmented_img[:, :border_width, :].reshape(-1, 3),
-            segmented_img[:, -border_width:, :].reshape(-1, 3)
-        ])
-        background_color = np.mean(border_pixels, axis=0)
+    border_pixels = np.concatenate([
+        segmented_img[:border_width, :, :].reshape(-1, 3),
+        segmented_img[-border_width:, :, :].reshape(-1, 3),
+        segmented_img[:, :border_width, :].reshape(-1, 3),
+        segmented_img[:, -border_width:, :].reshape(-1, 3)
+    ])
+    background_color = np.mean(border_pixels, axis=0)
 
-        color_distance = np.linalg.norm(
-            segmented_img.astype(np.float32) -
-            background_color.astype(np.float32),
-            axis=2
-        )
-        fg_mask = (color_distance > 30).astype(np.uint8)
+    color_distance = np.linalg.norm(
+        segmented_img.astype(np.float32) -
+        background_color.astype(np.float32),
+        axis=2
+    )
+    fg_mask = (color_distance > 100).astype(np.uint8)
+    print(
+        f"{cfg['filename']}: "
+        f"foreground = {np.mean(fg_mask)*100:.2f}%"
+    )
         
     bokeh_50 = apply_bokeh_blur(img_rgb, fg_mask, diameter=50)
     bokeh_100 = apply_bokeh_blur(img_rgb, fg_mask, diameter=100)
