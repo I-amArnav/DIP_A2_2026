@@ -4,14 +4,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-def get_manual_mask(img):
-    h, w = img.shape[:2]
-    mask = np.zeros((h, w), dtype=np.uint8)
-    pts = np.array([[int(w*0.15), int(h*0.25)], [int(w*0.85), int(h*0.25)], 
-                    [int(w*0.90), int(h*0.90)], [int(w*0.10), int(h*0.90)]])
-    cv2.fillPoly(mask, [pts], 1)
-    return mask
-
 def create_disc_kernel(diameter):
     radius = diameter / 2.0
     k_dim = int(np.ceil(diameter))
