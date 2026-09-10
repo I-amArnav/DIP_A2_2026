@@ -63,6 +63,7 @@ def compute_masked_ncc_channel_fast(image_channel, template_channel, mask):
     corr = fftconvolve(img, np.flip(tmpl_norm), mode='valid')
     with np.errstate(divide='ignore', invalid='ignore'):
         ncc_map = np.where(patch_rms > 0, corr / patch_rms, 0.0)
+    #To be changed, to if-else.
     return ncc_map
 
 def resize_image(img, new_shape):

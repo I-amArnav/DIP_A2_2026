@@ -4,17 +4,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-def mean_shift_segmentation(img, spatial_radius=15, color_radius=30):
-    img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    segmented_bgr = cv2.pyrMeanShiftFiltering(
-        img_bgr,
-        sp=spatial_radius,
-        sr=color_radius,
-        maxLevel=1
-    )
-    segmented_rgb = cv2.cvtColor(segmented_bgr, cv2.COLOR_BGR2RGB)
-    return segmented_rgb
-
 def get_manual_mask(img):
     h, w = img.shape[:2]
     mask = np.zeros((h, w), dtype=np.uint8)
@@ -91,12 +80,13 @@ output_dir="./output_q5"
 os.makedirs(output_dir, exist_ok=True)
 
 images_config = [
-    {"filename": "deep.png"},
-    {"filename": "lotus.png"},
-    {"filename": "marigold.png"}
+    {"filename": "deep"},
+    {"filename": "lotus"},
+    {"filename": "marigold"}
 ]
 for cfg in images_config:
-    in_path = os.path.join(input_dir, cfg["filename"])
+    in_path = os.path.join(input_dir, cfg["filename"]+".png")
+    mask_path = os.path.join(input_dir, cfg["filename"]+"_mask.png")
     
     if not os.path.exists(in_path):
         print(f"Skipping {in_path}: File not found.")
@@ -104,27 +94,13 @@ for cfg in images_config:
     print(f"Processing {cfg['filename']}...")
     
     img_rgb = iio.imread(in_path)        
-    segmented_img = mean_shift_segmentation(
-        img_rgb,
-        spatial_radius=15,
-        color_radius=30
-    )
-    border_width = 10
+    segmented_img = iio.imread(mask_path)
 
-    border_pixels = np.concatenate([
-        segmented_img[:border_width, :, :].reshape(-1, 3),
-        segmented_img[-border_width:, :, :].reshape(-1, 3),
-        segmented_img[:, :border_width, :].reshape(-1, 3),
-        segmented_img[:, -border_width:, :].reshape(-1, 3)
-    ])
-    background_color = np.mean(border_pixels, axis=0)
+    if segmented_img.ndim == 3:
+        segmented_img = np.max(segmented_img, axis=2)
 
-    color_distance = np.linalg.norm(
-        segmented_img.astype(np.float32) -
-        background_color.astype(np.float32),
-        axis=2
-    )
-    fg_mask = (color_distance > 100).astype(np.uint8)
+    fg_mask = (segmented_img > 0).astype(np.uint8)
+
     print(
         f"{cfg['filename']}: "
         f"foreground = {np.mean(fg_mask)*100:.2f}%"
