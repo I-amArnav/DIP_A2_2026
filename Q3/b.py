@@ -37,13 +37,11 @@ def process_and_save(image_path, sigma, low_thresh, high_thresh):
     file_stem = os.path.splitext(base_name)[0]
     
     composite_save_path = os.path.join(output_dir, f"{file_stem}_result.png")
-    plt.savefig(composite_save_path, bbox_inches='tight', dpi=300)
+    plt.savefig(composite_save_path, bbox_inches='tight')
     plt.close(fig)
 
     iio.imwrite(os.path.join(output_dir, f"{file_stem}_binary.png"), edge_binary)
     iio.imwrite(os.path.join(output_dir, f"{file_stem}_overlay.png"), overlay_img)
-
-    print(f"Saved results for {base_name} to folder '{output_dir}/'")
 
 os.makedirs(output_dir, exist_ok=True)    
 process_and_save("../data/edge/butterfly.png", sigma=1.2, low_thresh=0.05, high_thresh=0.18)

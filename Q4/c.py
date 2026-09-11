@@ -33,25 +33,18 @@ def process_image(img_path, output_dir, params):
     os.makedirs(output_dir, exist_ok=True)
     img = iio.imread(img_path)
     
-    gray, (Ix2, Iy2, Ixy), (l1, l2), _ = compute_structure_tensor(
-        img, sigma_d=params['sigma_d'], sigma_i=params['sigma_i']
-    )
+    gray, (Ix2, Iy2, Ixy), (l1, l2), _ = compute_structure_tensor(img, sigma_d=params['sigma_d'], sigma_i=params['sigma_i'])
     C_harris = harris_stephens_cornerness(Ix2, Iy2, Ixy, k=params['k'])    
     C_shitomasi = l2
 
-    harris_nms, harris_binary = detect_corners(
-        C_harris, nms_size=params['nms_size'], threshold=params['harris_thresh']
-    )
-    st_nms, st_binary = detect_corners(
-        C_shitomasi, nms_size=params['nms_size'], threshold=params['st_thresh']
-    )
+    harris_nms, harris_binary = detect_corners(C_harris, nms_size=params['nms_size'], threshold=params['harris_thresh'])
+    st_nms, st_binary = detect_corners(C_shitomasi, nms_size=params['nms_size'], threshold=params['st_thresh'])
 
     edge_nms_C, edge_binary = harris_stephens_edge_detection( C_harris, nms_size=params['edge_nms_size'], edge_threshold=params['edge_thresh'] )
 
-    orig_u8 = normalize_and_convert_u8(gray)
     harris_corners_overlay = draw_pixels_on_image(img, harris_binary, color_rgb=[0, 0, 0])      # Black corners
     st_corners_overlay = draw_pixels_on_image(img, st_binary, color_rgb=[0, 0, 0])          # Black corners
-    harris_edges_overlay = draw_pixels_on_image(orig_u8, edge_binary, color_rgb=[255, 255, 255])  # White edges
+    harris_edges_overlay = draw_pixels_on_image(img, edge_binary, color_rgb=[255, 255, 255])  # White edges
 
     iio.imwrite(os.path.join(output_dir, f"{base_name}_1_input.png"), img)
     iio.imwrite(os.path.join(output_dir, f"{base_name}_2_lambda1.png"), normalize_and_convert_u8(l1))
@@ -67,24 +60,36 @@ def process_image(img_path, output_dir, params):
     iio.imwrite(os.path.join(output_dir, f"{base_name}_9_harris_edge_binary.png"), (edge_binary * 255).astype(np.uint8))
     iio.imwrite(os.path.join(output_dir, f"{base_name}_10_harris_edges_drawn.png"), harris_edges_overlay)
 
-    print(f"Processed {base_name} successfully. Results saved in {output_dir}/")
-
-
 configs = {
     '../data/corner/nandadevi.png': {
-        'sigma_d': 1.0, 'sigma_i': 1.5, 'k': 0.04,
-        'nms_size': 5, 'harris_thresh': 0.01, 'st_thresh': 0.02,
-        'edge_nms_size': 3, 'edge_thresh': 0.05
+        'sigma_d': 1.0,
+        'sigma_i': 1.5,
+        'k': 0.04, #low => more corners. Tune later
+        'nms_size': 5, # low => More pixels
+        'harris_thresh': 0.01, # low => more corners
+        'st_thresh': 0.02, # low => more corners
+        'edge_nms_size': 3, # low => thicker edges
+        'edge_thresh': 0.05 # low => more edges
     },
     '../data/corner/paithaniCorner.png': {
-        'sigma_d': 1.0, 'sigma_i': 1.5, 'k': 0.04,
-        'nms_size': 5, 'harris_thresh': 0.015, 'st_thresh': 0.025,
-        'edge_nms_size': 3, 'edge_thresh': 0.05
+        'sigma_d': 1.0,
+        'sigma_i': 1.5,
+        'k': 0.04,
+        'nms_size': 5,
+        'harris_thresh': 0.015,
+        'st_thresh': 0.025,
+        'edge_nms_size': 3,
+        'edge_thresh': 0.05
     },
     '../data/corner/warli.png': {
-        'sigma_d': 1.0, 'sigma_i': 1.5, 'k': 0.04,
-        'nms_size': 5, 'harris_thresh': 0.01, 'st_thresh': 0.02,
-        'edge_nms_size': 3, 'edge_thresh': 0.05
+        'sigma_d': 1.0,
+        'sigma_i': 1.5,
+        'k': 0.04,
+        'nms_size': 5,
+        'harris_thresh': 0.01,
+        'st_thresh': 0.02,
+        'edge_nms_size': 3,
+        'edge_thresh': 0.05
     }
 }
 
@@ -93,4 +98,4 @@ for img_path, params in configs.items():
     if os.path.exists(img_path):
         process_image(img_path, out_folder, params)
     else:
-        print(f"Warning: File {img_path} not found.")
+        print(f"File {img_path} not found.")

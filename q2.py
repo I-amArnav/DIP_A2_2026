@@ -17,22 +17,40 @@ def save_ncc_image(ncc_map, filename):
 
 def compute_ncc_channel_fast(image_channel, template_channel):
     img = image_channel.astype(np.float64)
-    tmpl = template_channel.astype(np.float64)    
+    tmpl = template_channel.astype(np.float64)
+    
     H_h, H_w = tmpl.shape
-    
-    tmpl_rms = np.sqrt(np.mean(tmpl ** 2))
-    if tmpl_rms == 0:
-        return np.zeros((img.shape[0] - H_h + 1, img.shape[1] - H_w + 1))
-    tmpl_norm = tmpl / tmpl_rms
 
+    # Normalize template using L2 norm
+    tmpl_norm_factor = np.sqrt(np.sum(tmpl ** 2))
+
+    if tmpl_norm_factor == 0:
+        return np.zeros((img.shape[0] - H_h + 1,
+                         img.shape[1] - H_w + 1))
+
+    tmpl_norm = tmpl / tmpl_norm_factor
+
+    # Sum of squares of every image patch
     box_kernel = np.ones((H_h, H_w), dtype=np.float64)
-    patch_sq_sum = fftconvolve(img ** 2, box_kernel, mode='valid')
-    
-    N = H_h * H_w
-    patch_rms = np.sqrt(np.maximum(patch_sq_sum / N, 0))
-    corr = fftconvolve(img, np.flip(tmpl_norm), mode='valid')
+    patch_sq_sum = fftconvolve(
+        img ** 2,
+        box_kernel,
+        mode='valid'
+    )
+
+    corr = fftconvolve(
+        img,
+        np.flip(tmpl_norm),
+        mode='valid'
+    )
+
     with np.errstate(divide='ignore', invalid='ignore'):
-        ncc_map = np.where(patch_rms > 0, corr / patch_rms, 0.0)
+        ncc_map = np.where(
+            patch_sq_sum > 0,
+            corr / np.sqrt(patch_sq_sum),
+            0.0
+        )
+
     return ncc_map
 
 def match_template_ncc_fast(scene_image, template_image):
@@ -51,19 +69,30 @@ def compute_masked_ncc_channel_fast(image_channel, template_channel, mask):
     if N_valid == 0:
         return np.zeros((img.shape[0] - tmpl.shape[0] + 1, img.shape[1] - tmpl.shape[1] + 1))
 
-    tmpl_valid = tmpl[mask.astype(bool)]
-    tmpl_rms = np.sqrt(np.mean(tmpl_valid ** 2))
-    if tmpl_rms == 0:
-        return np.zeros((img.shape[0] - tmpl.shape[0] + 1, img.shape[1] - tmpl.shape[1] + 1))
-    
-    tmpl_norm = (tmpl * m) / tmpl_rms
-    patch_sq_sum_masked = fftconvolve(img ** 2, m, mode='valid')
-    patch_rms = np.sqrt(np.maximum(patch_sq_sum_masked / N_valid, 0))
-
-    corr = fftconvolve(img, np.flip(tmpl_norm), mode='valid')
+    tmpl_masked = tmpl * m
+    tmpl_norm_factor = np.sqrt(np.sum(tmpl_masked ** 2))
+    if tmpl_norm_factor == 0:
+        return np.zeros((
+            img.shape[0] - tmpl.shape[0] + 1,
+            img.shape[1] - tmpl.shape[1] + 1
+        ))
+    tmpl_norm = tmpl_masked / tmpl_norm_factor
+    patch_sq_sum_masked = fftconvolve(
+        img ** 2,
+        m,
+        mode='valid'
+    )
+    corr = fftconvolve(
+        img,
+        np.flip(tmpl_norm),
+        mode='valid'
+    )
     with np.errstate(divide='ignore', invalid='ignore'):
-        ncc_map = np.where(patch_rms > 0, corr / patch_rms, 0.0)
-    #To be changed, to if-else.
+        ncc_map = np.where(
+            patch_sq_sum_masked > 0,
+            corr / np.sqrt(patch_sq_sum_masked),
+            0.0
+        )
     return ncc_map
 
 def resize_image(img, new_shape):
@@ -125,6 +154,26 @@ for sz in sizes_b:
     ncc_res = match_template_ncc_fast(scene_b, tmpl_resized)
     
     avg_ncc = np.mean(ncc_res, axis=-1)
+
+    for ch, color in enumerate(['R', 'G', 'B']):
+            channel = ncc_res[:, :, ch]
+    
+            max_ncc = np.max(channel)
+            pos = np.unravel_index(np.argmax(channel), channel.shape)
+    
+            print(
+                f"{sz[0]}x{sz[1]}, "
+                f"{color}: max NCC = {max_ncc:.4f}, "
+                f"location = {pos}"
+            )
+
+    max_ncc = np.max(avg_ncc)
+    max_pos = np.unravel_index(np.argmax(avg_ncc), avg_ncc.shape)
+
+    print(f"{sz[0]}x{sz[1]} - avg:")
+    print(f"    Max NCC = {max_ncc:.4f}")
+    print(f"    Location = {max_pos}")
+
     save_ncc_image(avg_ncc, f'output_q2/ncc_b_{sz[0]}x{sz[1]}_avg.png')
     
     for ch, color in enumerate(['R', 'G', 'B']):
@@ -148,6 +197,26 @@ for sz in sizes_d:
         
     ncc_res_d = np.stack(ncc_channels, axis=-1)
     avg_ncc_d = np.mean(ncc_res_d, axis=-1)
+    
+    for ch, color in enumerate(['R', 'G', 'B']):
+            channel = ncc_res_d[:, :, ch]
+    
+            max_ncc = np.max(channel)
+            pos = np.unravel_index(np.argmax(channel), channel.shape)
+    
+            print(
+                f"{sz[0]}x{sz[1]}, "
+                f"{color}: max NCC = {max_ncc:.4f}, "
+                f"location = {pos}"
+            )
+
+    max_ncc = np.max(avg_ncc_d)
+    max_pos = np.unravel_index(np.argmax(avg_ncc_d), avg_ncc_d.shape)
+
+    print(f"{sz[0]}x{sz[1]} - avg:")
+    print(f"    Max NCC = {max_ncc:.4f}")
+    print(f"    Location = {max_pos}")
+
     save_ncc_image(avg_ncc_d, f'output_q2/ncc_d_{sz[0]}x{sz[1]}_avg.png')
     
     for ch, color in enumerate(['R', 'G', 'B']):

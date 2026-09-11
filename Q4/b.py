@@ -23,18 +23,12 @@ def detect_corners(response, nms_size=5, threshold=0.01):
 def harris_stephens_edge_detection(C_harris, nms_size=3, edge_threshold=0.01):
 
     edgeness = np.maximum(-C_harris, 0.0)
-    nms_edge_strength = non_max_suppression_2d(
-        edgeness,
-        neighborhood_size=nms_size
-    )
+    nms_edge_strength = non_max_suppression_2d(edgeness, neighborhood_size=nms_size)
     max_edge = np.max(nms_edge_strength)
     if max_edge > 0:
         thresh_val = edge_threshold * max_edge
     else:
         thresh_val = 0
-    binary_edge = (
-        (nms_edge_strength > 0) &
-        (nms_edge_strength >= thresh_val)
-    ).astype(np.uint8)
+    binary_edge = ((nms_edge_strength > 0) & (nms_edge_strength >= thresh_val)).astype(np.uint8)
     nms_C = np.where(binary_edge > 0, nms_edge_strength, 0.0)
     return nms_C, binary_edge

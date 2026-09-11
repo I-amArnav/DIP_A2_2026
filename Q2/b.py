@@ -39,24 +39,14 @@ def resize_image(img, new_shape):
             Ic = img[y1[:, None], x0[None, :], c]
             Id = img[y1[:, None], x1[None, :], c]
 
-            result[:, :, c] = (
-                Ia * (1 - wy[:, None]) * (1 - wx[None, :]) +
-                Ib * (1 - wy[:, None]) * wx[None, :] +
-                Ic * wy[:, None] * (1 - wx[None, :]) +
-                Id * wy[:, None] * wx[None, :]
-            )
+            result[:, :, c] = (Ia * (1 - wy[:, None]) * (1 - wx[None, :]) + Ib * (1 - wy[:, None]) * wx[None, :] + Ic * wy[:, None] * (1 - wx[None, :]) + Id * wy[:, None] * wx[None, :])
     else:
         Ia = img[y0[:, None], x0[None, :]]
         Ib = img[y0[:, None], x1[None, :]]
         Ic = img[y1[:, None], x0[None, :]]
         Id = img[y1[:, None], x1[None, :]]
 
-        result = (
-            Ia * (1 - wy[:, None]) * (1 - wx[None, :]) +
-            Ib * (1 - wy[:, None]) * wx[None, :] +
-            Ic * wy[:, None] * (1 - wx[None, :]) +
-            Id * wy[:, None] * wx[None, :]
-        )
+        result = (Ia * (1 - wy[:, None]) * (1 - wx[None, :]) + Ib * (1 - wy[:, None]) * wx[None, :] + Ic * wy[:, None] * (1 - wx[None, :]) + Id * wy[:, None] * wx[None, :])
     return result
 
 scene = imageio.imread('../data/templateMatch/parking.png')

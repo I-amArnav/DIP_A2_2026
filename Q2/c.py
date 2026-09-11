@@ -11,17 +11,17 @@ def compute_masked_ncc_channel(image_channel, template_channel, mask):
     if N_valid == 0:
         return np.zeros((img.shape[0] - tmpl.shape[0] + 1, img.shape[1] - tmpl.shape[1] + 1))
 
-    tmpl_valid = tmpl[mask.astype(bool)]
-    tmpl_rms = np.sqrt(np.mean(tmpl_valid ** 2))
-    if tmpl_rms == 0:
+    tmpl_masked = tmpl * m
+    tmpl_norm_factor = np.sqrt(np.sum(tmpl_masked ** 2))
+    if tmpl_norm_factor == 0:
         return np.zeros((img.shape[0] - tmpl.shape[0] + 1, img.shape[1] - tmpl.shape[1] + 1))
-    
-    tmpl_norm = (tmpl * m) / tmpl_rms
-    patch_sq_sum_masked = fftconvolve(img ** 2, m, mode='valid')
-    patch_rms = np.sqrt(np.maximum(patch_sq_sum_masked / N_valid, 0))
+    tmpl_norm = tmpl_masked / tmpl_norm_factor
 
+    patch_sq_sum = fftconvolve(img ** 2, m, mode='valid')
     corr = fftconvolve(img, np.flip(tmpl_norm), mode='valid')
-    with np.errstate(divide='ignore', invalid='ignore'):
-        ncc_map = np.where(patch_rms > 0, corr / patch_rms, 0.0)
+
+    ncc_map = np.zeros_like(corr)
+    mask = patch_sq_sum > 0
+    ncc_map[mask] = corr[mask] / np.sqrt(patch_sq_sum[mask])
 
     return ncc_map

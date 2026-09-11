@@ -36,7 +36,7 @@ def process_and_save(image_path, output_dir=".", sigma_val=1.5, s1=1.0, s2=2.5):
             ax.set_title(title)
             ax.axis('off')
             fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-            plt.savefig(save_path, bbox_inches='tight', dpi=300)
+            plt.savefig(save_path, bbox_inches='tight')
             plt.close(fig)
         else:
             iio.imwrite(save_path, data)
